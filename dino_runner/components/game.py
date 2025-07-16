@@ -25,11 +25,12 @@ class Game:
         
         # 4. Variáveis importantes do jogo
         self.playing = False
-        self.game_speed = 10
+        self.game_speed = 13
         self.x_pos_bg = 0
         self.y_pos_bg = 380
         self.obstacle_list = []
         self.death_count = 0 
+        self.score = 0
 
     def spawn_obstacle(self):
         if random.randint(0, 1) == 0:
@@ -72,30 +73,25 @@ class Game:
                     # ...manda o jogador se levantar usando o método que criamos
                     self.player.unduck()
 
-    # Em game.py, substitua seu método update() por este:
     def update(self):
         self.player.update()
+        self.score += 1
+
+        # A cada 100 pontos, aumenta a velocidade do jogo
+        if self.score % 100 == 0 and self.score > 0:
+            self.game_speed += 1
 
         if len(self.obstacle_list) == 0:
             self.spawn_obstacle()
 
         for obstacle in self.obstacle_list:
             obstacle.update(self.game_speed, self.obstacle_list)
-            # --- LÓGICA DE COLISÃO ---
-            # cria uma cópia da hitbox do jogador e a encolhe
-            player_hitbox = self.player.dino_rect.inflate(-25, -5) # Encolhe 25px na largura e 15px na altura
-
-             # Cria uma cópia da hitbox do obstáculo e a encolhe
-            obstacle_hitbox = obstacle.rect.inflate(-20, -10)
-
-
-            if player_hitbox.colliderect(obstacle_hitbox):
+            if self.player.dino_rect.colliderect(obstacle.rect):
                 self.player.die()
                 pygame.time.delay(500)
                 self.playing = False
                 self.death_count += 1
                 break
-            # --- FIM DA LÓGICA ---
 
         # Movimentação do chão
         image_width = BG.get_width()
@@ -104,32 +100,31 @@ class Game:
             self.x_pos_bg = 0
 
     def draw(self):
-        # Pinta a tela de branco
         self.screen.fill((255, 255, 255))
-
-        # Pega a largura da imagem do chão
         image_width = BG.get_width()
-
-        # Desenha a primeira imagem do chão
         self.screen.blit(BG, (self.x_pos_bg, self.y_pos_bg))
-        # Desenha a segunda imagem do chão, logo após a primeira
         self.screen.blit(BG, (self.x_pos_bg + image_width, self.y_pos_bg))
 
         self.player.draw(self.screen)
 
-        # desenha o hitbox do jogador para testes
-        pygame.draw.rect(self.screen, (255, 0, 0), self.player.dino_rect, 2)
-
-        # Desenha todos os obstáculos na lista
         for obstacle in self.obstacle_list:
             obstacle.draw(self.screen)
-            # desenhar hitbox do obstáculo para testes
-            pygame.draw.rect(self.screen, (0, 0, 255), obstacle.rect, 2)
 
+        # --- CORREÇÃO AQUI ---
+        # 1. Formata a pontuação para ter 5 dígitos (ex: 00100)
+        score_text = f"{self.score:05d}"
+        # 2. Desenha APENAS os números formatados na tela
+        draw_message_component(score_text, self.screen, pos_x_center=1000, pos_y_center=50)
+        # --- FIM DA CORREÇÃO ---
+
+        # Lógica do Game Over
         if self.death_count > 0:
             draw_message_component("GAME OVER", self.screen)
 
-        # Atualiza a tela para mostrar o que foi desenhado
+        # Não se esqueça de desenhar as hitboxes se você ainda as estiver usando para debug
+        pygame.draw.rect(self.screen, (255, 0, 0), self.player.dino_rect, 2)
+        for obstacle in self.obstacle_list:
+             pygame.draw.rect(self.screen, (0, 0, 255), obstacle.rect, 2)
+
         pygame.display.update()
-        # Garante que o jogo rode no FPS definido
         self.clock.tick(FPS)
