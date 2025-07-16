@@ -7,30 +7,90 @@ from dino_runner.components.dinosaur import Dinosaur
 from dino_runner.components.obstacles.cactus import Cactus
 from dino_runner.components.obstacles.bird import Bird
 from dino_runner.utils.text_utils import draw_message_component
-from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, TITLE, FPS, ICON, BG
+from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, TITLE, FPS, ICON, BG, RUNNING
 
 class Game:
+
     def __init__(self):
-        # 1. Inicializa todos os módulos do pygame que são necessários
         pygame.init()
-        self.player = Dinosaur()
-        
-        # 2. Define a largura e altura da tela, e o título
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption(TITLE)
-        pygame.display.set_icon(ICON) # Define o ícone da janela
-        
-        # 3. Cria um objeto Clock para ajudar a controlar a taxa de quadros (FPS)
+        pygame.display.set_icon(ICON)
         self.clock = pygame.time.Clock()
-        
-        # 4. Variáveis importantes do jogo
-        self.playing = False
+
+        # Variáveis do jogo
+        self.player = Dinosaur()
+        self.obstacle_list = []
         self.game_speed = 13
+        self.score = 0
+        self.death_count = 0
         self.x_pos_bg = 0
         self.y_pos_bg = 380
-        self.obstacle_list = []
-        self.death_count = 0 
+
+        # Variáveis de controle
+        self.running = True
+        self.game_state = "MENU"
+
+        # Carrega a imagem do dino para o menu
+        self.menu_dino_image = RUNNING[0]
+        # Redimensiona a imagem para ficar maior no menu
+        self.menu_dino_image = pygame.transform.scale(self.menu_dino_image, (120, 120))
+
+    def show_menu(self):
+        self.screen.fill((255, 255, 255))
+    
+        # --- POSIÇÕES CORRIGIDAS ---
+        # 1. Desenha o dinossauro um pouco mais para cima
+        self.screen.blit(self.menu_dino_image, (SCREEN_WIDTH // 2 - 60, SCREEN_HEIGHT // 2 - 250))
+        
+        # 2. Desenha o título abaixo do dinossauro
+        draw_message_component("Dino Runner", self.screen, font_size=50, pos_y_center=SCREEN_HEIGHT // 2 - 100)
+        
+        # 3. Desenha os botões mais para baixo, deixando espaço para o título
+        play_button_rect = draw_message_component("Jogar", self.screen, pos_y_center=SCREEN_HEIGHT // 2 + 50, has_background=True, return_rect=True)
+        exit_button_rect = draw_message_component("Sair", self.screen, pos_y_center=SCREEN_HEIGHT // 2 + 120, has_background=True, return_rect=True)
+        # --- FIM DAS CORREÇÕES ---
+    
+        # O loop de eventos continua o mesmo
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if play_button_rect.collidepoint(event.pos):
+                    self.game_state = "RUNNING"
+                elif exit_button_rect.collidepoint(event.pos):
+                    self.running = False
+    
+        pygame.display.update()
+        self.clock.tick(FPS)
+
+    def reset_game(self):
+        self.obstacle_list.clear()
+        self.player.reset()
         self.score = 0
+        self.game_speed = 13
+
+    def show_game_over_screen(self):
+        self.screen.fill((255, 255, 255))
+        score_text = f"Sua Pontuacao: {self.score:05d}"
+        draw_message_component("GAME OVER", self.screen, font_size=50, pos_y_center=SCREEN_HEIGHT // 2 - 100)
+        draw_message_component(score_text, self.screen, font_size=30, pos_y_center=SCREEN_HEIGHT // 2 - 50)
+
+        retry_button_rect = draw_message_component("Jogar Novamente", self.screen, pos_y_center=SCREEN_HEIGHT // 2 + 50, has_background=True, return_rect=True)
+        menu_button_rect = draw_message_component("Menu Principal", self.screen, pos_y_center=SCREEN_HEIGHT // 2 + 120, has_background=True, return_rect=True)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if retry_button_rect.collidepoint(event.pos):
+                    self.reset_game()
+                    self.game_state = "RUNNING"
+                elif menu_button_rect.collidepoint(event.pos):
+                    self.reset_game()
+                    self.game_state = "MENU"
+        pygame.display.update()
+        self.clock.tick(FPS)
 
     def spawn_obstacle(self):
         if random.randint(0, 1) == 0:
@@ -38,39 +98,42 @@ class Game:
         else:
             self.obstacle_list.append(Bird())
 
+    def run_gameplay(self):
+        # A lógica que já tínhamos para rodar o jogo
+        self.events()
+        self.update()
+        self.draw()
+
     def execute(self):
-        # Transforma a variável self.playing em True para iniciar o jogo
-        self.playing = True
-        # Loop principal do jogo
-        while self.playing:
-            # Verifica se algum evento ocorreu
-            self.events()
-            # Atualiza o estado do jogo
-            self.update()
-            # Desenha os elementos na tela
-            self.draw()
-        
-        # Quando o loop termina, fecha o pygame
+        while self.running:
+            if self.game_state == "MENU":
+                # Nosso próximo passo será criar este método
+                self.show_menu() 
+            elif self.game_state == "RUNNING":
+                # A lógica que já temos de eventos, update e draw
+                self.run_gameplay() 
+            elif self.game_state == "GAME_OVER":
+                # Outro método que criaremos
+                self.show_game_over_screen() 
+
         pygame.quit()
 
     def events(self):
         for event in pygame.event.get():
-            # Evento para fechar a janela
+            # Fecha o game ao fechar o executável
             if event.type == pygame.QUIT:
-                self.playing = False
+                self.running = False # <--- CORREÇÃO AQUI (era self.playing)
 
-            # SEÇÃO 1: VERIFICA TECLAS PRESSIONADAS
+            # Eventos de TECLA PRESSIONADA
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP or event.key == pygame.K_SPACE:
                     self.player.jump()
                 elif event.key == pygame.K_DOWN:
                     self.player.duck()
 
-            # SEÇÃO 2: VERIFICA TECLAS SOLTAS (no mesmo nível do KEYDOWN)
+            # Evento de TECLA SOLTA
             elif event.type == pygame.KEYUP:
-                # Se a tecla que foi solta é a SETA PARA BAIXO...
                 if event.key == pygame.K_DOWN:
-                    # ...manda o jogador se levantar usando o método que criamos
                     self.player.unduck()
 
     def update(self):
@@ -84,14 +147,24 @@ class Game:
         if len(self.obstacle_list) == 0:
             self.spawn_obstacle()
 
+        # Atualiza todos os obstáculos na lista
         for obstacle in self.obstacle_list:
             obstacle.update(self.game_speed, self.obstacle_list)
-            if self.player.dino_rect.colliderect(obstacle.rect):
+
+            # --- Bloco de Colisão Completo e Corrigido ---
+            # Cria as hitboxes encolhidas para uma colisão justa
+            player_hitbox = self.player.dino_rect.inflate(-25, -5)
+            obstacle_hitbox = obstacle.rect.inflate(-20, -10)
+
+            # A verificação de colisão usa as hitboxes justas
+            if player_hitbox.colliderect(obstacle_hitbox):
+                # Chama o método de morte do jogador
                 self.player.die()
-                pygame.time.delay(500)
-                self.playing = False
-                self.death_count += 1
+                # Muda o estado do jogo para GAME_OVER
+                self.game_state = "GAME_OVER"
+                # Para o loop assim que encontrar a primeira colisão
                 break
+            # --- Fim do Bloco de Colisão ---
 
         # Movimentação do chão
         image_width = BG.get_width()
