@@ -2,6 +2,8 @@
     "conventionalCommits.scopes": [
         "core",
         "game",
-        "game_flow"
+        "game_flow",
+        "game_modes",
+        "roguelite"
     ]
 }
