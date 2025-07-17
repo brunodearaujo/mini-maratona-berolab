@@ -1,6 +1,7 @@
 {
     "conventionalCommits.scopes": [
         "core",
-        "game"
+        "game",
+        "game_flow"
     ]
 }

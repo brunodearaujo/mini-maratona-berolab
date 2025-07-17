@@ -1,5 +1,5 @@
-from dino_runner.components.game import Game
+from dino_runner.components.game import GameController
 
 if __name__ == "__main__":
-    game = Game()
+    game = GameController()
     game.execute()

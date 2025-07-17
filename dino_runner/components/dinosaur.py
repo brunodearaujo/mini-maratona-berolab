@@ -4,7 +4,7 @@ from dino_runner.utils.constants import RUNNING, JUMPING, DUCKING, DEAD
 
 # Em dinosaur.py
 
-class Dinosaur:
+class PlatformerDino:
     # --- Constantes de Física (RESTAURANDO SEUS VALORES) ---
     X_POS = 80
     Y_POS = 310
@@ -36,40 +36,26 @@ class Dinosaur:
         self.dino_rect.x = self.X_POS
         self.dino_rect.y = self.Y_POS
         self.step_index = 0
+        # novas variáveis de movimento
+        self.x_vel = 0  # Velocidade horizontal
+        self.y_vel = 0  # Velocidade vertical (para futuros pulos, etc.)
+        self.speed = 10 # Velocidade de movimento do dino
 
-    def update(self):
-        if self.is_dead:
-            return # Se estiver morto, não faz mais nada
+    def update(self, user_input):
+        # Processa os comandos do jogador
+        if user_input[pygame.K_LEFT]:
+            self.x_vel = -self.speed
+        elif user_input[pygame.K_RIGHT]:
+            self.x_vel = self.speed
+        else:
+            self.x_vel = 0
 
-        if self.is_jumping:
-            self.image = self.jumping_img
-            if self.is_ducking:
-                original_center = self.dino_rect.center
-                self.image = self.ducking_img[1]
-                self.dino_rect = self.image.get_rect()
-                self.dino_rect.center = original_center
-                self.jump_vel -= self.FAST_FALL_GRAVITY
-            
-            self.jump_vel -= self.GRAVITY
-            self.dino_rect.y -= self.jump_vel
-        
-        elif self.is_ducking:
-            self.duck_animation()
-        
-        elif self.is_running:
+        # Atualiza a posição X
+        self.dino_rect.x += self.x_vel
+
+        # Mantém a animação de corrida enquanto se move
+        if self.x_vel != 0:
             self.run_animation()
-
-        if not self.is_running and not self.is_ducking:
-            self.step_index = 0
-
-        if self.is_jumping and self.dino_rect.y >= self.Y_POS:
-            self.is_jumping = False
-            self.jump_vel = self.JUMP_VELOCITY
-            
-            if self.is_ducking:
-                self.set_duck_state()
-            else:
-                self.set_run_state()
 
     def run_animation(self):
         self.image = self.running_img[self.step_index // 5]
