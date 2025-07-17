@@ -2,6 +2,7 @@
 
 import pygame
 from dino_runner.components.modes.endless_runner import EndlessRunner
+from dino_runner.components.modes.roguelite_mode import RogueliteMode
 from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, TITLE, ICON, FPS, RUNNING
 from dino_runner.utils.text_utils import draw_message_component
 
@@ -16,6 +17,7 @@ class GameController:
         self.running = True
         self.game_state = "MENU"
         self.game_mode_instance = None
+        self.game_mode_type = "NORMAL"
         
         self.first_run = True
         self.high_score = 0
@@ -44,17 +46,25 @@ class GameController:
         pygame.quit()
 
     def run_gameplay(self, events):
+        # A lógica de criação da instância agora é mais flexível
         if not self.game_mode_instance:
-            self.game_mode_instance = EndlessRunner(self.screen, self.high_score, self.first_run)
-            self.first_run = False
+            if self.game_mode_type == "NORMAL": # <-- 3. ALTERAR ESTA SEÇÃO
+                self.game_mode_instance = EndlessRunner(self.screen, self.high_score, self.first_run)
+                self.first_run = False
+            elif self.game_mode_type == "ROGUELITE":
+                self.game_mode_instance = RogueliteMode(self.screen, self.high_score)
 
         is_still_running = self.game_mode_instance.run(events)
 
         if not is_still_running:
-            self.last_score = self.game_mode_instance.score
-            if self.last_score > self.high_score:
-                self.high_score = self.last_score
-                self.save_high_score()
+            # A lógica de high score precisará ser diferente para o modo roguelite,
+            # mas podemos ajustar isso depois.
+            if self.game_mode_type == "NORMAL":
+                self.last_score = self.game_mode_instance.score
+                if self.last_score > self.high_score:
+                    self.high_score = self.last_score
+                    self.save_high_score()
+            
             self.game_state = "GAME_OVER"
 
     def show_menu(self, events):
@@ -68,9 +78,12 @@ class GameController:
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if normal_button.collidepoint(event.pos):
+                    self.game_mode_type = "NORMAL" # <-- 4. DEFINIR O TIPO DE MODO
                     self.game_state = "RUNNING"
                 elif roguelite_button.collidepoint(event.pos):
-                    print("Modo Roguelite ainda não implementado!")
+                    self.game_mode_type = "ROGUELITE" # <-- 5. DEFINIR O TIPO DE MODO
+                    self.game_state = "RUNNING"
+                    print("Iniciando o modo Roguelite...")
 
     def show_game_over_screen(self, events):
         # A instância do jogo anterior é desenhada por trás do menu

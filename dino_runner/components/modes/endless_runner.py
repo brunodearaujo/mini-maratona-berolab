@@ -5,19 +5,47 @@ import random
 from dino_runner.components.dinos.endless_runner_dino import EndlessRunnerDino
 from dino_runner.components.obstacles.cactus import Cactus
 from dino_runner.components.obstacles.bird import Bird
-from dino_runner.utils.constants import BG, SCREEN_WIDTH
+from dino_runner.utils.constants import BG, SCREEN_WIDTH, CLOUD
 from dino_runner.utils.text_utils import draw_message_component
+
+
+class Cloud:
+    def __init__(self):
+        # Carrega a imagem da nuvem e a posiciona aleatoriamente
+        self.image = CLOUD
+        # A posição inicial agora será definida na classe principal
+        self.x = 0
+        # A posição Y é aleatória na parte superior da tela
+        self.y = random.randint(50, 250)
+
+    def update(self, game_speed):
+        # Move a nuvem para a esquerda com metade da velocidade do jogo para criar um efeito de paralaxe
+        self.x -= game_speed
+    
+    def draw(self, screen):
+        # Desenha a nuvem na tela
+        screen.blit(self.image, (self.x, self.y))
 
 class EndlessRunner:
     def __init__(self, screen, high_score, first_run=False):
-        self.screen = screen
-        self.high_score = high_score
-        self.player = EndlessRunnerDino(first_run=first_run)
-        self.obstacle_list = []
-        self.game_speed = 13
-        self.score = 0
-        self.x_pos_bg = 0
-        self.y_pos_bg = 380
+            self.screen = screen
+            self.high_score = high_score
+            self.player = EndlessRunnerDino(first_run=first_run)
+            self.obstacle_list = []
+
+            # --- LÓGICA DE NUVENS CORRIGIDA (INICIALIZAÇÃO) ---
+            self.clouds = []
+            # Inicia o jogo com 3 nuvens já na tela
+            for i in range(3):
+                cloud = Cloud()
+                # Espalha as nuvens iniciais por toda a largura da tela
+                cloud.x = random.randint(0, SCREEN_WIDTH)
+                self.clouds.append(cloud)
+
+            self.game_speed = 13
+            self.score = 0
+            self.x_pos_bg = 0
+            self.y_pos_bg = 380
 
     def handle_events(self, events):
         # Este método processa a lista de eventos recebida do GameController
@@ -58,13 +86,31 @@ class EndlessRunner:
         return True # Indica que o jogo continua
 
     def update_background(self):
+        # --- Lógica do Chão (Track) ---
         image_width = BG.get_width()
         self.x_pos_bg -= self.game_speed
         if self.x_pos_bg <= -image_width:
             self.x_pos_bg = 0
 
+        # --- LÓGICA DE NUVENS CORRIGIDA (ATUALIZAÇÃO E RECICLAGEM) ---
+        for cloud in self.clouds:
+            # 1. Atualiza a posição da nuvem
+            cloud.update(self.game_speed / 3)
+            
+            # 2. Verifica se a nuvem saiu da tela pela esquerda
+            if cloud.x < -cloud.image.get_width():
+                # 3. Se sim, recicla a nuvem, movendo-a para a direita com uma nova altura
+                cloud.x = SCREEN_WIDTH + random.randint(200, 500)
+                cloud.y = random.randint(50, 250)
+
     def draw(self):
         self.screen.fill((255, 255, 255))
+
+         # --- Desenha as Nuvens ---
+        # As nuvens são desenhadas primeiro para ficarem no fundo
+        for cloud in self.clouds:
+            cloud.draw(self.screen)
+        
         image_width = BG.get_width()
         self.screen.blit(BG, (self.x_pos_bg, self.y_pos_bg))
         self.screen.blit(BG, (self.x_pos_bg + image_width, self.y_pos_bg))
