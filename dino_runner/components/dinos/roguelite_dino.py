@@ -1,59 +1,113 @@
 import pygame
-from dino_runner.utils.constants import START_IMAGE, SCREEN_WIDTH
+from dino_runner.utils.constants import START_IMAGE, RUNNING, SCREEN_WIDTH, SCREEN_HEIGHT
 
 class RogueliteDino:
     def __init__(self):
-            # ... (código existente: self.image, self.rect, etc.)
-            self.image = START_IMAGE
-            self.rect = self.image.get_rect()
-            self.rect.bottom = 380
-            self.rect.centerx = SCREEN_WIDTH / 2
+        # Carregando as imagens de animação
+        self.running_images = RUNNING
+        self.start_image = START_IMAGE
+        self.image_index = 0
+        self.current_image = self.running_images[0]
+        
+        # Atributos de posição e movimento
+        self.rect = self.current_image.get_rect(center=(SCREEN_WIDTH / 2, 380))
+        self.speed = 5 # Ajustei a velocidade para 8 direções
+        self.is_moving = False
+        
+        # Atributos de combate e progressão
+        self.health = 100
+        self.max_health = 100
+        self.exp = 0
+        self.exp_to_next_level = 100
+        self.level = 1
 
-            # Atributos de jogabilidade
-            self.speed = 8
-            self.health = 100
-            self.max_health = 100
-
-            # --- NOVOS ATRIBUTOS DE PROGRESSÃO ---
-            self.exp = 0
-            self.exp_to_next_level = 100 # A quantidade de EXP necessária para o próximo nível
-            self.level = 1
+        # Guarda a direção para virar o sprite
+        self.facing_right = True
 
     def update(self):
-        """Atualiza o estado do dinossauro a cada frame."""
-        # Pega um dicionário de todas as teclas que estão sendo pressionadas no momento.
+        # Pega o estado das teclas
         keys = pygame.key.get_pressed()
         
-        # Reseta a velocidade horizontal
-        vel_x = 0
+        # --- LÓGICA DE MOVIMENTO EM 8 DIREÇÕES ---
+        # Reseta a velocidade para este frame
+        vel_x, vel_y = 0, 0
         
-        # Verifica as teclas de movimento para a esquerda
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            vel_x = -self.speed
-            
-        # Verifica as teclas de movimento para a direita
+            vel_x = -1
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            vel_x = self.speed
-            
-        # Atualiza a posição horizontal do dinossauro
-        self.rect.x += vel_x
-        
-        # Adiciona limites para impedir que o dinossauro saia da tela
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH
-        
-        # Futuramente, aqui também atualizaremos animações e outros estados.
+            vel_x = 1
+        if keys[pygame.K_UP] or keys[pygame.K_w]:
+            vel_y = -1
+        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            vel_y = 1
 
+        # Normaliza o vetor de movimento para que a velocidade diagonal não seja maior
+        if vel_x != 0 and vel_y != 0:
+            vel_x /= 1.414 # Aproximadamente a raiz quadrada de 2
+            vel_y /= 1.414
+
+        # Aplica a velocidade ao movimento
+        self.rect.x += vel_x * self.speed
+        self.rect.y += vel_y * self.speed
+        
+        # Verifica se o jogador está se movendo para controlar a animação
+        self.is_moving = (vel_x != 0 or vel_y != 0)
+
+        # --- LÓGICA DE MIRA E SPRITE FLIP ---
+        mouse_pos = pygame.mouse.get_pos()
+        # Vira o sprite para a direita se o mouse estiver à direita do centro do dino
+        if mouse_pos[0] > self.rect.centerx:
+            self.facing_right = True
+        # Vira para a esquerda se o mouse estiver à esquerda
+        else:
+            self.facing_right = False
+            
+        # --- LÓGICA DE ANIMAÇÃO ---
+        self.animate()
+
+        # Limites da tela
+        if self.rect.left < 0: self.rect.left = 0
+        if self.rect.right > SCREEN_WIDTH: self.rect.right = SCREEN_WIDTH
+        if self.rect.top < 0: self.rect.top = 0
+        # --- CORREÇÃO DO CHÃO INVISÍVEL ---
+        # O limite inferior agora é a parte de baixo da tela
+        if self.rect.bottom > SCREEN_HEIGHT: self.rect.bottom = SCREEN_HEIGHT
+
+    def animate(self):
+        if self.is_moving:
+            self.image_index = (self.image_index + 0.25) % len(self.running_images)
+            self.current_image = self.running_images[int(self.image_index)]
+
+    def draw(self, screen):
+        # Vira a imagem horizontalmente se não estiver virado para a direita
+        image_to_draw = pygame.transform.flip(self.current_image, not self.facing_right, False)
+        screen.blit(image_to_draw, self.rect)
+        
+        
     def take_damage(self, amount):
-        """Reduz a vida do dinossauro."""
         self.health -= amount
         if self.health < 0:
             self.health = 0
-        # Futuramente, aqui podemos adicionar uma animação de dano ou invencibilidade temporária.
+    
+    def gain_exp(self, amount):
+        """Aumenta a EXP do jogador e verifica se ele subiu de nível."""
+        self.exp += amount
+        print(f"Ganhou {amount} de EXP! Total: {self.exp}/{self.exp_to_next_level}")
 
-    def draw(self, screen):
-        """Desenha o dinossauro na tela."""
-        screen.blit(self.image, self.rect)
+        if self.exp >= self.exp_to_next_level:
+            return self.level_up() # Retorna True para sinalizar que subiu de nível
+        return False
 
+    def level_up(self):
+        """Processa a lógica de subir de nível."""
+        self.level += 1
+        # Leva o excesso de EXP para o próximo nível
+        self.exp -= self.exp_to_next_level
+        # Aumenta a quantidade de EXP necessária para o próximo nível
+        self.exp_to_next_level = int(self.exp_to_next_level * 1.5)
+        
+        # Recupera um pouco de vida ao subir de nível
+        self.health = min(self.max_health, self.health + 25)
+
+        print(f"LEVEL UP! Você alcançou o nível {self.level}!")
+        return True
