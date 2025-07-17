@@ -12,6 +12,7 @@ class RogueliteDino:
         # Atributos de posição e movimento
         self.rect = self.current_image.get_rect(center=(SCREEN_WIDTH / 2, 380))
         self.speed = 5 # Ajustei a velocidade para 8 direções
+        self.weapon = None
         self.is_moving = False
         
         # Atributos de combate e progressão
@@ -23,6 +24,19 @@ class RogueliteDino:
 
         # Guarda a direção para virar o sprite
         self.facing_right = True
+        
+        # --- NOVO ATRIBUTO PARA ROUBO DE VIDA ---
+        self.life_steal_percent = 0.0 # Começa com 0%
+
+    def set_weapon(self, weapon_instance):
+        """Equipa uma arma no dinossauro."""
+        self.weapon = weapon_instance
+
+    def attack(self):
+        """Tenta executar um ataque com a arma equipada."""
+        if self.weapon:
+            return self.weapon.attack()
+        return None
 
     def update(self):
         # Pega o estado das teclas
@@ -65,6 +79,9 @@ class RogueliteDino:
         # --- LÓGICA DE ANIMAÇÃO ---
         self.animate()
 
+        if self.weapon:
+            self.weapon.update()
+
         # Limites da tela
         if self.rect.left < 0: self.rect.left = 0
         if self.rect.right > SCREEN_WIDTH: self.rect.right = SCREEN_WIDTH
@@ -81,14 +98,22 @@ class RogueliteDino:
     def draw(self, screen):
         # Vira a imagem horizontalmente se não estiver virado para a direita
         image_to_draw = pygame.transform.flip(self.current_image, not self.facing_right, False)
-        screen.blit(image_to_draw, self.rect)
-        
+        screen.blit(image_to_draw, self.rect)  
         
     def take_damage(self, amount):
+        """Reduz a vida do dinossauro e retorna True se ele morreu."""
         self.health -= amount
-        if self.health < 0:
+        if self.health <= 0:
             self.health = 0
-    
+            return True # Sinaliza que o jogador morreu
+        return False
+
+    def heal(self, amount):
+        """Aumenta a vida do dinossauro, sem ultrapassar a vida máxima."""
+        self.health += amount
+        if self.health > self.max_health:
+            self.health = self.max_health
+
     def gain_exp(self, amount):
         """Aumenta a EXP do jogador e verifica se ele subiu de nível."""
         self.exp += amount
