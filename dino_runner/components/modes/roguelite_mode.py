@@ -7,30 +7,36 @@ from dino_runner.components.weapons.bullet import Bullet
 from dino_runner.components.weapons.projectile import Projectile
 from dino_runner.components.weapons.pistol import Pistol
 from dino_runner.components.weapons.sword import Sword
-from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, FONT_STYLE
+from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 class RogueliteMode:
-    def __init__(self, screen, high_score):
+    def __init__(self, screen, high_score, assets):
         self.screen = screen
         self.initial_high_score = high_score
+        self.assets = assets # Armazena o AssetManager
         
-        self.title_font = pygame.font.Font(FONT_STYLE, 24) # Tamanho reduzido
-        self.body_font = pygame.font.Font(FONT_STYLE, 18)  # Tamanho reduzido
-        self.ui_font = pygame.font.Font(FONT_STYLE, 14)    # Tamanho reduzido
-        self.stats_font = pygame.font.Font(FONT_STYLE, 16) # Tamanho reduzido
+        # Pega as fontes do AssetManager
+        self.title_font = self.assets.get_font("title")
+        self.body_font = self.assets.get_font("body")
+        self.ui_font = self.assets.get_font("ui")
+        self.stats_font = self.assets.get_font("stats")
         
         self.reset()
 
     def reset(self):
         """Reseta o estado do jogo para uma nova partida."""
         self.running = True
-        self.player = RogueliteDino()
+        self.player = RogueliteDino(self.assets)
         self.current_wave = 0
         self.wave_in_progress = False
         self.enemies, self.projectiles = [], []
         self.game_state = "CHOOSE_WEAPON"
         self.score = 0
-        self.high_score = self.initial_high_score
+        
+        # CORREÇÃO DO RECORDE: O high_score agora é mantido entre os resets.
+        # Ele só é atualizado se o high_score inicial for maior (primeira vez que o jogo abre).
+        if not hasattr(self, 'high_score') or self.initial_high_score > self.high_score:
+            self.high_score = self.initial_high_score
         
         self.start_wave_button_rect, self.confirm_button_rect = None, None
         self.game_over_buttons, self.pause_buttons = {}, {}
@@ -311,27 +317,15 @@ class RogueliteMode:
         self.screen.blit(wave_text, wave_text.get_rect(topright=(SCREEN_WIDTH - 10, 10))); self.screen.blit(score_text, score_text.get_rect(topright=(SCREEN_WIDTH - 10, 30))); self.screen.blit(highscore_text, highscore_text.get_rect(topright=(SCREEN_WIDTH - 10, 50)))
 
     def player_attack_logic(self):
+        """Lógica de ataque unificada e corrigida."""
         attack_result = self.player.attack()
         if not attack_result: return
-        if isinstance(attack_result, Projectile): self.projectiles.append(attack_result)
-        elif isinstance(self.player.weapon, Sword) and self.player.weapon.is_swinging:
-            sword_hitbox = self.player.weapon.hitbox
-            if sword_hitbox:
-                for enemy in self.enemies[:]:
-                    if sword_hitbox.colliderect(enemy.rect):
-                        damage_dealt = self.player.weapon.damage; self.player.heal(damage_dealt * self.player.life_steal_percent)
-                        if enemy.take_damage(damage_dealt):
-                            self.score += enemy.max_health
-                            if self.player.gain_exp(enemy.exp_value): self.trigger_level_up()
-                            if enemy in self.enemies: self.enemies.remove(enemy)
 
-
-    def player_attack_logic(self):
-        attack_result = self.player.attack()
-        if not attack_result: return
+        # CORREÇÃO DA PISTOLA: Esta é a lógica correta que verifica a tupla.
+        if isinstance(attack_result, tuple) and attack_result[0] == "BULLET":
+            _, x, y, direction = attack_result
+            self.projectiles.append(Bullet(x, y, direction, self.assets))
         
-        if isinstance(attack_result, Projectile):
-            self.projectiles.append(attack_result)
         elif isinstance(self.player.weapon, Sword) and self.player.weapon.is_swinging:
             sword_hitbox = self.player.weapon.hitbox
             if sword_hitbox:
@@ -345,6 +339,7 @@ class RogueliteMode:
                                 self.trigger_level_up()
                             if enemy in self.enemies: self.enemies.remove(enemy)
 
+
     def start_next_wave(self):
         self.current_wave += 1; self.wave_in_progress = True; self.spawn_enemies_for_wave()
     
@@ -355,4 +350,4 @@ class RogueliteMode:
             if edge == 'left': x, y = -50, random.randint(0, SCREEN_HEIGHT)
             elif edge == 'right': x, y = SCREEN_WIDTH + 50, random.randint(0, SCREEN_HEIGHT)
             else: x, y = random.randint(0, SCREEN_WIDTH), -50
-            self.enemies.append(Zumbi(x, y))
+            self.enemies.append(Zumbi(x, y, self.assets))

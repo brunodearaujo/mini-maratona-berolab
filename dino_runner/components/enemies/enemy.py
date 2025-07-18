@@ -1,14 +1,9 @@
+# dino_runner/components/enemies/enemy.py
 import pygame
 
 class Enemy:
-    def __init__(self, x, y, image_path, health, damage, speed, exp_value):
-        # ... (código existente no __init__)
-        try:
-            self.image = pygame.image.load(image_path).convert_alpha()
-        except pygame.error:
-            self.image = pygame.Surface((30, 50))
-            self.image.fill((0, 180, 0))
-
+    def __init__(self, x, y, image, health, damage, speed, exp_value):
+        self.image = image
         self.rect = self.image.get_rect(center=(x, y))
         self.health = health
         self.max_health = health

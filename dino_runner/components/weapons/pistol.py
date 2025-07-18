@@ -11,11 +11,9 @@ class Pistol(Weapon):
         current_time = pygame.time.get_ticks()
         if current_time - self.last_attack_time >= self.attack_cooldown:
             self.last_attack_time = current_time
-            
             mouse_pos = pygame.mouse.get_pos()
             player_pos = self.player.rect.center
             direction = pygame.math.Vector2(mouse_pos[0] - player_pos[0], mouse_pos[1] - player_pos[1]).normalize()
-            
-            # Retorna a bala criada para que o modo de jogo possa gerenciá-la
-            return Bullet(player_pos[0], player_pos[1], direction)
+            # Retorna uma tupla para que o RogueliteMode possa criar a bala
+            return ("BULLET", player_pos[0], player_pos[1], direction)
         return None

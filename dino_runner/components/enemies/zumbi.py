@@ -1,3 +1,4 @@
+# dino_runner/components/enemies/zumbi.py
 import pygame
 from dino_runner.components.enemies.enemy import Enemy
 import os
@@ -6,15 +7,14 @@ import os
 ZUMBI_IMAGE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "enemies", "zumbi.png")
 
 class Zumbi(Enemy):
-    def __init__(self, x, y):
-        # Valores específicos para o Zumbi
+    def __init__(self, x, y, assets): # Recebe o AssetManager
         health = 100
         damage = 10
         speed = 2
         exp_value = 50
-
-        # Chama o construtor da classe pai (Enemy)
-        super().__init__(x, y, ZUMBI_IMAGE_PATH, health, damage, speed, exp_value)
+        # Pega a imagem do AssetManager e a passa para a classe pai
+        image = assets.get_image("ZUMBI")
+        super().__init__(x, y, image, health, damage, speed, exp_value)
 
     def update(self, player):
         """Implementa a IA do Zumbi: mover-se em direção ao jogador."""

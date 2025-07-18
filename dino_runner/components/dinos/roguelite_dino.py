@@ -1,33 +1,33 @@
+# Arquivo: dino_runner/components/dinos/roguelite_dino.py
+
 import pygame
-from dino_runner.utils.constants import START_IMAGE, RUNNING, SCREEN_WIDTH, SCREEN_HEIGHT
+from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT
+from dino_runner.components.weapons.pistol import Pistol
+from dino_runner.components.weapons.sword import Sword
 
 class RogueliteDino:
-    def __init__(self):
-        # Carregando as imagens de animação
-        self.running_images = RUNNING
-        self.start_image = START_IMAGE
+    def __init__(self, assets):
+        self.assets = assets
+
+        self.running_images = self.assets.get_image("BERO_RUNNING")
+        self.start_image = self.assets.get_image("BERO_START")
+
         self.image_index = 0
-        self.current_image = self.running_images[0]
-        
-        # Atributos de posição e movimento
+        self.current_image = self.start_image
+
         self.rect = self.current_image.get_rect(center=(SCREEN_WIDTH / 2, 380))
-        self.speed = 5 # Ajustei a velocidade para 8 direções
-        self.weapon = None
+        self.speed = 5
         self.is_moving = False
-        
-        # Atributos de combate e progressão
+
         self.health = 100
         self.max_health = 100
         self.exp = 0
         self.exp_to_next_level = 100
         self.level = 1
-
-        # Guarda a direção para virar o sprite
+        self.weapon = None
         self.facing_right = True
+        self.life_steal_percent = 0.0
         
-        # --- NOVO ATRIBUTO PARA ROUBO DE VIDA ---
-        self.life_steal_percent = 0.0 # Começa com 0%
-
     def set_weapon(self, weapon_instance):
         """Equipa uma arma no dinossauro."""
         self.weapon = weapon_instance

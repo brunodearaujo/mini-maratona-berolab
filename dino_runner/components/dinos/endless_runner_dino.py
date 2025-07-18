@@ -1,8 +1,6 @@
 # dino_runner/components/dinos/endless_runner_dino.py
 
 import pygame
-from dino_runner.utils.constants import RUNNING, JUMPING, DUCKING, DEAD, START_IMAGE
-
 class EndlessRunnerDino:
     # --- Constantes de Física ---
     X_POS = 80
@@ -12,13 +10,13 @@ class EndlessRunnerDino:
     GRAVITY = 3
     FAST_FALL_GRAVITY = 3 # Gravidade extra para a queda rápida
 
-    def __init__(self, first_run=False):
-        # --- Carregando as imagens ---
-        self.running_img = RUNNING
-        self.jumping_img = JUMPING
-        self.ducking_img = DUCKING
-        self.dead_img = DEAD
-        self.start_img = START_IMAGE
+    def __init__(self, assets, first_run=False):
+        self.assets = assets
+        self.running_img = self.assets.get_image("DINO_RUNNING")
+        self.jumping_img = self.assets.get_image("DINO_JUMP")
+        self.ducking_img = self.assets.get_image("DINO_DUCKING")
+        self.dead_img = self.assets.get_image("DINO_DEAD")
+        self.start_img = self.assets.get_image("DINO_START")
 
         # --- Estado Inicial ---
         self.is_waiting = first_run
