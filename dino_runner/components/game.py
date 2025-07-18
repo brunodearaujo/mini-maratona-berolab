@@ -20,9 +20,10 @@ class GameController:
         self.game_mode_type = "NORMAL"
         
         self.first_run = True
-        self.high_score = 0
+        self.high_score_normal = 0
+        self.high_score_roguelite = 0
         self.last_score = 0
-        self.load_high_score()
+        self.load_high_scores()
 
         self.menu_dino_image = pygame.transform.scale(RUNNING[0], (120, 120))
 
@@ -38,7 +39,10 @@ class GameController:
             elif self.game_state == "MENU":
                 self.show_menu(events)
             elif self.game_state == "GAME_OVER":
-                self.show_game_over_screen(events)
+                if self.game_mode_type == "NORMAL":
+                    self.show_game_over_screen(events)
+                else:
+                    self.game_state = "MENU"
 
             pygame.display.update()
             self.clock.tick(FPS)
@@ -46,26 +50,35 @@ class GameController:
         pygame.quit()
 
     def run_gameplay(self, events):
-        # A lógica de criação da instância agora é mais flexível
         if not self.game_mode_instance:
-            if self.game_mode_type == "NORMAL": # <-- 3. ALTERAR ESTA SEÇÃO
-                self.game_mode_instance = EndlessRunner(self.screen, self.high_score, self.first_run)
+            if self.game_mode_type == "NORMAL":
+                self.game_mode_instance = EndlessRunner(self.screen, self.high_score_normal, self.first_run)
                 self.first_run = False
             elif self.game_mode_type == "ROGUELITE":
-                self.game_mode_instance = RogueliteMode(self.screen, self.high_score)
+                self.game_mode_instance = RogueliteMode(self.screen, self.high_score_roguelite)
 
-        is_still_running = self.game_mode_instance.run(events)
+        run_result = self.game_mode_instance.run(events)
 
-        if not is_still_running:
-            # A lógica de high score precisará ser diferente para o modo roguelite,
-            # mas podemos ajustar isso depois.
+        # Verifica se o modo de jogo terminou
+        if not run_result or run_result == "MENU":
+            # CORREÇÃO 2: Salva o recorde apropriado ANTES de qualquer outra ação
             if self.game_mode_type == "NORMAL":
                 self.last_score = self.game_mode_instance.score
-                if self.last_score > self.high_score:
-                    self.high_score = self.last_score
-                    self.save_high_score()
+                if self.last_score > self.high_score_normal:
+                    self.high_score_normal = self.last_score
+                    self.save_high_score("NORMAL")
+            elif self.game_mode_type == "ROGUELITE":
+                if self.game_mode_instance.score > self.high_score_roguelite:
+                    self.high_score_roguelite = self.game_mode_instance.score
+                    self.save_high_score("ROGUELITE")
             
-            self.game_state = "GAME_OVER"
+            # Muda para o estado apropriado
+            if run_result == "MENU":
+                self.game_state = "MENU"
+                self.game_mode_instance = None # Limpa a instância aqui
+            else: # run_result é False (Game Over)
+                self.game_state = "GAME_OVER"
+                # CORREÇÃO 1: NÃO limpa a instância aqui, para que a tela de game over possa desenhá-la
 
     def show_menu(self, events):
         self.screen.fill((255, 255, 255))
@@ -78,16 +91,18 @@ class GameController:
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if normal_button.collidepoint(event.pos):
-                    self.game_mode_type = "NORMAL" # <-- 4. DEFINIR O TIPO DE MODO
+                    self.game_mode_type = "NORMAL"
+                    self.game_mode_instance = None
                     self.game_state = "RUNNING"
                 elif roguelite_button.collidepoint(event.pos):
-                    self.game_mode_type = "ROGUELITE" # <-- 5. DEFINIR O TIPO DE MODO
+                    self.game_mode_type = "ROGUELITE"
+                    self.game_mode_instance = None
                     self.game_state = "RUNNING"
-                    print("Iniciando o modo Roguelite...")
 
     def show_game_over_screen(self, events):
         # A instância do jogo anterior é desenhada por trás do menu
-        self.game_mode_instance.draw()
+        if self.game_mode_instance:
+            self.game_mode_instance.draw()
 
         score_text = f"Sua Pontuacao: {self.last_score:05d}"
         draw_message_component("GAME OVER", self.screen, font_size=50, pos_y_center=SCREEN_HEIGHT // 2 - 100)
@@ -99,19 +114,30 @@ class GameController:
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if retry_button_rect.collidepoint(event.pos):
-                    self.game_mode_instance = None # Limpa o jogo antigo
+                    # CORREÇÃO 1: Limpa o jogo antigo AQUI, após o clique
+                    self.game_mode_instance = None
                     self.game_state = "RUNNING"
                 elif menu_button_rect.collidepoint(event.pos):
+                    # CORREÇÃO 1: Limpa o jogo antigo AQUI, após o clique
                     self.game_mode_instance = None
                     self.game_state = "MENU"
 
-    def load_high_score(self):
+    def load_high_scores(self):
         try:
-            with open("highscore.txt", "r") as f:
-                self.high_score = int(f.read())
-        except (FileNotFoundError, ValueError):
-            self.high_score = 0
+            with open("highscore_normal.txt", "r") as f:
+                self.high_score_normal = int(f.read())
+        except (FileNotFoundError, ValueError): self.high_score_normal = 0
+        try:
+            with open("highscore_roguelite.txt", "r") as f:
+                self.high_score_roguelite = int(f.read())
+        except (FileNotFoundError, ValueError): self.high_score_roguelite = 0
     
-    def save_high_score(self):
-        with open("highscore.txt", "w") as f:
-            f.write(str(self.high_score))
+    def save_high_score(self, mode):
+        if mode == "NORMAL":
+            filename, score = "highscore_normal.txt", self.high_score_normal
+        elif mode == "ROGUELITE":
+            filename, score = "highscore_roguelite.txt", self.high_score_roguelite
+        else: return
+            
+        with open(filename, "w") as f:
+            f.write(str(score))

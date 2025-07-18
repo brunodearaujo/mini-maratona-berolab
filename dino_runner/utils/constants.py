@@ -8,6 +8,9 @@ SCREEN_WIDTH = 1100
 FPS = 30
 IMG_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
 
+# --- FONTES ---
+FONT_STYLE = os.path.join(os.path.dirname(__file__), '..', 'assets', 'font', 'PressStart2P-Regular.ttf')
+
 # Assets Constants
 ICON = pygame.image.load(os.path.join(IMG_DIR, "DinoWallpaper.png"))
 CLOUD = pygame.image.load(os.path.join(IMG_DIR,"Other/Cloud.png"))
