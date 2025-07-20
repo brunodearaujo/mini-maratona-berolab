@@ -1,7 +1,11 @@
+# Ficheiro: dino_runner/utils/sound_manager.py
+# Descrição: Classe para carregar e reproduzir todos os sons e músicas.
+
 import pygame
 import os
 
 class SoundManager:
+    """Gerencia o carregamento e a reprodução de áudio, respeitando as configurações."""
     def __init__(self, settings):
         self.sfx_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "sfx")
         self.music_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "music")
@@ -10,6 +14,7 @@ class SoundManager:
         self._load_sounds()
 
     def _load_sound(self, name, filename):
+        """Carrega um efeito sonoro."""
         full_path = os.path.join(self.sfx_dir, filename)
         try:
             self.sounds[name] = pygame.mixer.Sound(full_path)
@@ -18,6 +23,7 @@ class SoundManager:
             self.sounds[name] = None
 
     def _load_sounds(self):
+        """Define e carrega todos os efeitos sonoros."""
         self._load_sound("pistol_shot", "pistol_shot.wav")
         self._load_sound("sword_slash", "sword_slash.wav")
         self._load_sound("player_hit", "player_hit.wav")

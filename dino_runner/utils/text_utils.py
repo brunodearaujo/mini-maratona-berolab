@@ -1,3 +1,6 @@
+# Ficheiro: dino_runner/utils/text_utils.py
+# Descrição: Função auxiliar para desenhar texto formatado no ecrã.
+
 import pygame
 import os
 from dino_runner.utils.constants import SCREEN_HEIGHT, SCREEN_WIDTH
@@ -19,6 +22,8 @@ def draw_message_component(
     bg_color=(0, 0, 0), 
     return_rect=False 
 ):
+    """Desenha uma mensagem de texto, opcionalmente com um fundo."""
+
     try:
         # Usa o FONT_PATH definido neste ficheiro.
         font = pygame.font.Font(FONT_PATH, font_size)

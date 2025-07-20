@@ -1,8 +1,5 @@
-"""
-Este arquivo contém todas as constantes globais e estáticas do jogo.
-NÃO deve haver carregamento de assets (imagens, sons) aqui para evitar
-erros de inicialização do Pygame.
-"""
+# Ficheiro: dino_runner/utils/constants.py
+# Descrição: Contém constantes estáticas (valores, textos) usadas em todo o jogo.
 import os
 
 # --- Configurações da Tela e Jogo ---

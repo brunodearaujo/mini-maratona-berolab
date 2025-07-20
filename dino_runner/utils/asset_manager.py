@@ -1,8 +1,11 @@
+# Ficheiro: dino_runner/utils/asset_manager.py
+# Descrição: Classe centralizada para carregar e gerir todos os assets (imagens e fontes).
 import pygame
 import os
 from dino_runner.utils.constants import FONT_PATH # Importa o caminho da fonte
 
 class AssetManager:
+    """Carrega todos os recursos visuais e de texto uma única vez."""
     def __init__(self):
         self.assets_dir = os.path.join(os.path.dirname(__file__), "..", "assets")
         self.images = {}
@@ -10,7 +13,7 @@ class AssetManager:
         self._load_assets()
 
     def _load_image(self, name, path, convert_alpha=True):
-        """Função auxiliar para carregar uma imagem e armazená-la."""
+        """Função auxiliar para carregar e otimizar uma imagem."""
         full_path = os.path.join(self.assets_dir, path)
         try:
             image = pygame.image.load(full_path)
@@ -18,9 +21,11 @@ class AssetManager:
             self.images[name] = image.convert_alpha() if convert_alpha else image.convert()
             # Retorna a imagem para uso imediato (ex: ao criar listas)
             return self.images[name]
-        except pygame.error as e:
-            print(f"Não foi possível carregar a imagem: {full_path}")
-            raise SystemExit(e)
+        except pygame.error:
+            print(f"AVISO: Imagem não encontrada em '{full_path}'. A usar um placeholder.")
+            placeholder = pygame.Surface((50, 50)); placeholder.fill((255, 0, 255))
+            self.images[name] = placeholder
+            return placeholder
 
     def _load_font(self, name, path, size):
         """Função auxiliar para carregar uma fonte."""
