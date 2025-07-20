@@ -44,7 +44,9 @@ class Sword(Weapon):
                 self.is_swinging = False
                 self.hitbox = None
     
-    def draw(self, screen):
-        # Desenha a hitbox da espada para debug quando ela está ativa
+    def draw(self, screen, offset=[0, 0]):
+        """Desenha a hitbox da espada, considerando o offset."""
         if self.is_swinging and self.hitbox:
-            pygame.draw.rect(screen, (255, 255, 255, 150), self.hitbox, 3)
+            # Cria uma cópia da hitbox deslocada pelo offset
+            offset_hitbox = self.hitbox.move(offset[0], offset[1])
+            pygame.draw.rect(screen, (255, 255, 255, 150), offset_hitbox, 3)

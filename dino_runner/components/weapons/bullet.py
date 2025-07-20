@@ -7,7 +7,7 @@ BULLET_IMAGE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets"
 
 class Bullet(Projectile):
     # Valores base que serão modificados pelos power-ups
-    BASE_DAMAGE = 25
+    BASE_DAMAGE = 50
     BASE_PIERCE = 1
 
     def __init__(self, x, y, direction, assets):

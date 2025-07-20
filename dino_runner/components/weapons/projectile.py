@@ -15,5 +15,6 @@ class Projectile:
         self.rect.x += self.direction.x * self.speed
         self.rect.y += self.direction.y * self.speed
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+    def draw(self, screen, offset=[0, 0]):
+        """Desenha o projétil na posição correta, considerando o offset."""
+        screen.blit(self.image, (self.rect.x + offset[0], self.rect.y + offset[1]))

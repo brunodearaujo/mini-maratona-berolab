@@ -1,41 +1,214 @@
-# dino_runner/components/enemies/enemy.py
+# dino_runner/components/enemies/bero_run/enemy.py
+
 import pygame
+import random
+from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+from dino_runner.components.weapons.shard import Shard
 
 class Enemy:
-    def __init__(self, x, y, image, health, damage, speed, exp_value):
+    def __init__(self, x, y, image, health, damage, speed, exp_value, is_boss=False, rage_chance=0.1):
+        self.original_image = image
         self.image = image
         self.rect = self.image.get_rect(center=(x, y))
+        self.is_boss = is_boss
+        self.is_in_rage = False
+
+        # --- ATRIBUTOS PARA O FLASH DE DANO ---
+        self.is_flashing = False
+        self.flash_duration = 100 # Duração do flash em milissegundos
+        self.flash_start_time = 0
+
+
+        # --- 1. NOVOS ATRIBUTOS PARA O COMBO DE SKILL ---
+        self.skill_cooldown = 8000 # Aumentei o cooldown geral para 8s
+        self.last_skill_time = 0
+        self.is_casting = False      # Está no meio do combo de 3 ataques?
+        self.cast_count = 0          # Quantos ataques já fez no combo
+        self.time_between_casts = 600 # 0.6s entre cada ataque do combo
+        self.last_cast_time = 0
+
+        # Atributos para a transformação do chefe
+        self.is_transforming = False
+        self.is_invulnerable = False
+        self.damage_resistance = 0.0
+        self.transformation_start_time = 0
+        self.flash_timer = 0
+        self.show_image = True
+        self.heal_amount_per_second = 0
+
+        self.is_entering = False
+        self.entry_target_pos = (SCREEN_WIDTH / 2, 150) # Posição final da entrada
+        # Modificadores de Chefe
+        if self.is_boss:
+            health *= 5; damage *= 2; exp_value *= 10
+            scaled_image = pygame.transform.scale_by(self.original_image, 2)
+            self.image = scaled_image
+            self.original_image = scaled_image
+            self.rect = self.image.get_rect(center=self.rect.center)
+            # Ativa o estado de entrada para o chefe
+            self.is_entering = True
+        
         self.health = health
         self.max_health = health
         self.damage = damage
         self.speed = speed
         self.exp_value = exp_value
 
-    def update(self, player):
-        pass
+        if not self.is_boss and random.random() < rage_chance:
+            self.activate_rage()
 
-    def draw(self, screen):
-        # Desenha o inimigo na tela
-        screen.blit(self.image, self.rect)
-        # --- DESENHA A BARRA DE VIDA DO INIMIGO ---
-        self.draw_health_bar(screen)
+    def use_ground_slam(self, enemy_projectiles, assets):
+        """O chefe bate no chão, lançando estilhaços em 8 direções com um leve desvio."""
+        print(f"CHEFE usou Ground Slam #{self.cast_count + 1}!")
+        
+        # Adiciona um pequeno desvio ao ângulo de cada ataque do combo
+        angle_offset = random.uniform(-15, 15)
+        
+        directions = [
+            pygame.math.Vector2(1, 0), pygame.math.Vector2(-1, 0),
+            pygame.math.Vector2(0, 1), pygame.math.Vector2(0, -1),
+            pygame.math.Vector2(1, 1).normalize(), pygame.math.Vector2(1, -1).normalize(),
+            pygame.math.Vector2(-1, 1).normalize(), pygame.math.Vector2(-1, -1).normalize()
+        ]
+        
+        for direction in directions:
+            # Rotaciona o vetor de direção pelo desvio
+            rotated_direction = direction.rotate(angle_offset)
+            shard = Shard(self.rect.centerx, self.rect.centery, rotated_direction, assets)
+            enemy_projectiles.append(shard)
+
+    def start_transformation(self):
+        """Inicia a sequência de transformação do chefe."""
+        if self.is_transforming or self.is_in_rage: return
+
+        print("!!! O CHEFE ESTÁ SE TRANSFORMANDO !!!")
+        self.is_transforming = True
+        self.is_invulnerable = True
+        self.transformation_start_time = pygame.time.get_ticks()
+        self.heal_amount_per_second = self.max_health / 3.0
+
+    def finish_transformation(self):
+        """Finaliza a transformação e ativa o modo rage."""
+        self.is_transforming = False
+        self.is_invulnerable = False
+        self.health = self.max_health
+        self.damage_resistance = 0.3
+        self.show_image = True
+        self.activate_rage()
+
+    def activate_rage(self):
+        """Ativa o modo de raiva, aumentando status e mudando a aparência."""
+        if self.is_in_rage: return
+        self.is_in_rage = True
+        self.speed *= 1.5
+        self.health = int(self.health * 1.5)
+        self.max_health = self.health
+        red_image = self.original_image.copy()
+        red_filter = pygame.Surface(red_image.get_size()).convert_alpha()
+        red_filter.fill((255, 0, 0, 100))
+        red_image.blit(red_filter, (0, 0))
+        self.image = red_image
 
     def take_damage(self, amount):
-        # ... (código existente)
-        self.health -= amount
-        return self.health <= 0
+        if self.is_invulnerable: return False
+        if self.is_boss and not self.is_in_rage and (self.health - amount) / self.max_health <= 0.3:
+            self.start_transformation()
+            return False
         
-    def draw_health_bar(self, screen):
-        """Desenha uma barra de vida abaixo do inimigo."""
-        if self.health < self.max_health: # Só desenha se o inimigo já tomou dano
+        actual_damage = amount * (1 - self.damage_resistance)
+        self.health -= actual_damage
+        
+        # Ativa o flash de dano
+        self.is_flashing = True
+        self.flash_start_time = pygame.time.get_ticks()
+
+        return self.health <= 0
+
+    def update(self, player, enemy_projectiles):
+
+        if self.is_flashing:
+            current_time = pygame.time.get_ticks()
+            if current_time - self.flash_start_time > self.flash_duration:
+                self.is_flashing = False
+
+
+        """Atualiza a lógica do inimigo, incluindo a transformação e o movimento."""
+        if self.is_transforming:
+            current_time = pygame.time.get_ticks()
+            
+            self.health += self.heal_amount_per_second / FPS
+            if self.health > self.max_health: self.health = self.max_health
+
+            self.flash_timer += 1
+            self.show_image = self.flash_timer % 10 >= 5
+
+            if current_time - self.transformation_start_time > 3000:
+                self.finish_transformation()
+            return # Para qualquer outra lógica enquanto se transforma
+
+        # --- 2. LÓGICA DE ATIVAÇÃO E EXECUÇÃO DO COMBO DE SKILL ---
+        current_time = pygame.time.get_ticks()
+
+        # Se for um chefe, não estiver se transformando ou já castando...
+        if self.is_boss and not self.is_transforming and not self.is_casting:
+            # ...e o cooldown principal acabou, inicia o combo.
+            if current_time - self.last_skill_time > self.skill_cooldown:
+                self.is_casting = True
+                self.cast_count = 0
+                self.last_cast_time = current_time # Inicia o timer para o primeiro cast
+
+        # Se estiver no meio do combo...
+        if self.is_casting:
+            # ...verifica se é hora de castar o próximo ataque.
+            if self.cast_count < 3 and current_time - self.last_cast_time > self.time_between_casts:
+                self.use_ground_slam(enemy_projectiles, self.assets)
+                self.cast_count += 1
+                self.last_cast_time = current_time
+            
+            # Se já fez os 3 ataques, termina o combo e inicia o cooldown principal.
+            elif self.cast_count >= 3:
+                self.is_casting = False
+                self.last_skill_time = current_time
+            
+            # Fica parado enquanto estiver castando
+            return
+
+        # --- 3. LÓGICA DE MOVIMENTO (SÓ EXECUTA SE NÃO ESTIVER CASTANDO) ---
+        dx = player.rect.centerx - self.rect.centerx
+        dy = player.rect.centery - self.rect.centery
+        distance = (dx**2 + dy**2)**0.5
+        if distance > 0:
+            dx /= distance; dy /= distance
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
+
+        
+
+
+    def draw(self, screen, offset=[0, 0]):
+        """Desenha o inimigo e sua barra de vida, considerando o offset."""
+        image_to_draw = self.image
+        if self.is_flashing:
+            white_image = self.original_image.copy()
+            white_image.fill((255, 255, 255, 180), special_flags=pygame.BLEND_RGBA_MULT)
+            image_to_draw = white_image
+        
+        if self.show_image:
+            screen.blit(image_to_draw, (self.rect.x + offset[0], self.rect.y + offset[1]))
+        
+        # A barra de vida também precisa receber o offset
+        self.draw_health_bar(screen, offset)
+
+
+    def draw_health_bar(self, screen, offset=[0, 0]):
+        """Desenha a barra de vida na posição correta, considerando o offset."""
+        if self.health < self.max_health:
             health_ratio = self.health / self.max_health
-            # Posição e tamanho da barra
             bar_width = self.rect.width * 0.8
             bar_height = 5
-            bar_x = self.rect.centerx - (bar_width / 2)
-            bar_y = self.rect.bottom + 5 # Um pouco abaixo do inimigo
+            # Aplica o offset à posição da barra
+            bar_x = self.rect.centerx - (bar_width / 2) + offset[0]
+            bar_y = self.rect.bottom + 5 + offset[1]
             
-            # Desenha o fundo da barra (vermelho)
             pygame.draw.rect(screen, (180, 0, 0), (bar_x, bar_y, bar_width, bar_height))
-            # Desenha a vida atual (verde)
             pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, bar_width * health_ratio, bar_height))

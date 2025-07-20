@@ -66,16 +66,28 @@ class AssetManager:
             self._load_image("BIRD_2", "Bird/Bird2.png")
         ]
         
-        # --- Personagem Bero (Modo Roguelite) ---
+        # --- Personagem (Modo Roguelite) ---
         self._load_image("BERO_START", "Bero/Bero.png")
-        self.images["BERO_RUNNING"] = [
-            self.images["BERO_START"],
-            self.images["BERO_START"] # Repete a imagem até ter a segunda
-        ]
+        self.images["BERO_RUNNING"] = [ self.images["BERO_START"], self.images["BERO_START"] ]
         
         # --- Inimigos e Armas (Modo Roguelite) ---
         self._load_image("BULLET", "weapons/bullet.png")
-        self._load_image("ZUMBI", "enemies/zumbi.png")
+        self._load_image("ENEMY_BULLET", "weapons/enemy_bullet.png")
+        self._load_image("SHARD", "weapons/shard.png")
+
+        # --- Inimigos do Caminho do Dino (Pistoleiro) ---
+        self._load_image("CACTO1", "enemies/dino_path/cacto1.png")
+        self._load_image("CACTO2", "enemies/dino_path/cacto2.png")
+        self._load_image("BIRD1", "enemies/dino_path/bird1.png")
+        self._load_image("BIRD2", "enemies/dino_path/bird2.png")
+        self._load_image("CACTO3", "enemies/dino_path/cacto3.png") # Boss
+
+        # --- Inimigos do Caminho do Bero (Espadachim) ---
+        self._load_image("MIGUEL", "enemies/bero_path/miguel.png")
+        self._load_image("PAM", "enemies/bero_path/pam.png")
+        self._load_image("TEKI", "enemies/bero_path/teki.png")
+        self._load_image("DANN", "enemies/bero_path/dann.png")
+        self._load_image("BERO", "enemies/bero_path/bero.png") # Boss
 
         # --- Fontes ---
         self._load_font("title", FONT_PATH, 24)

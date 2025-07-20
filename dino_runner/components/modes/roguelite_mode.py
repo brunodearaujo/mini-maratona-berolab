@@ -2,12 +2,51 @@ import pygame
 import random
 import math
 from dino_runner.components.dinos.roguelite_dino import RogueliteDino
-from dino_runner.components.enemies.zumbi import Zumbi
+from dino_runner.components.enemies.bero_run.bero import Bero
+from dino_runner.components.enemies.dino_run.cacto1 import Cacto1
+from dino_runner.components.enemies.bero_run.miguel import Miguel
+from dino_runner.components.enemies.dino_run.cacto2 import Cacto2
+from dino_runner.components.enemies.bero_run.pam import Pam
+from dino_runner.components.enemies.dino_run.cacto3 import Cacto3
+from dino_runner.components.enemies.bero_run.dann import Dann
+from dino_runner.components.enemies.dino_run.bird1 import Bird1
+from dino_runner.components.enemies.bero_run.teki import Teki
+from dino_runner.components.enemies.dino_run.bird2 import Bird2
 from dino_runner.components.weapons.bullet import Bullet
 from dino_runner.components.weapons.projectile import Projectile
+from dino_runner.components.weapons.enemy_projectile import EnemyProjectile
 from dino_runner.components.weapons.pistol import Pistol
 from dino_runner.components.weapons.sword import Sword
 from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT
+
+
+class DamageNumber(pygame.sprite.Sprite):
+    def __init__(self, x, y, damage, font):
+        super().__init__()
+        self.image = font.render(str(int(damage)), True, (255, 255, 0)) # Texto amarelo
+        self.rect = self.image.get_rect(center=(x, y))
+        self.creation_time = pygame.time.get_ticks()
+        self.duration = 500 # Meio segundo de vida
+        self.y_velocity = -2 # Sobe lentamente
+
+    def update(self):
+        self.rect.y += self.y_velocity
+        if pygame.time.get_ticks() - self.creation_time > self.duration:
+            self.kill() # Remove o sprite do grupo quando o tempo acabar
+
+class PlayerDamageNumber(DamageNumber):
+    def __init__(self, x, y, damage, font):
+        super().__init__(x, y, damage, font)
+        # Usa a cor vermelha para o dano recebido
+        self.image = font.render(str(int(damage)), True, (255, 50, 50))
+
+# --- NOVA CLASSE PARA NÚMEROS DE CURA ---
+class HealNumber(DamageNumber):
+    def __init__(self, x, y, amount, font):
+        super().__init__(x, y, amount, font)
+        display_amount = max(1, int(amount))
+        self.image = font.render(str(display_amount), True, (50, 255, 50)) # Verde para cura
+
 
 class RogueliteMode:
     def __init__(self, screen, high_score, assets):
@@ -24,31 +63,38 @@ class RogueliteMode:
         self.reset()
 
     def reset(self):
-        """Reseta o estado do jogo para uma nova partida."""
         self.running = True
         self.player = RogueliteDino(self.assets)
-        self.current_wave = 0
+        self.current_wave = 9
         self.wave_in_progress = False
-        self.enemies, self.projectiles = [], []
+        self.enemies, self.projectiles, self.enemy_projectiles = [], [], []
         self.game_state = "CHOOSE_WEAPON"
         self.score = 0
-        
-        # CORREÇÃO DO RECORDE: O high_score agora é mantido entre os resets.
-        # Ele só é atualizado se o high_score inicial for maior (primeira vez que o jogo abre).
         if not hasattr(self, 'high_score') or self.initial_high_score > self.high_score:
             self.high_score = self.initial_high_score
-        
+        self.damage_numbers = pygame.sprite.Group()
+        self.screen_shake = 0
+        self.shake_duration = 15
         self.start_wave_button_rect, self.confirm_button_rect = None, None
         self.game_over_buttons, self.pause_buttons = {}, {}
         self.powerup_card_rects, self.powerup_options = [], []
         self.selected_option_index = None
+        
+        # CORREÇÃO: Atributo para controlar o feedback de cura do chefe inicializado aqui
+        self.last_boss_heal_feedback_time = 0
 
         self.define_powerups()
+        self.define_enemy_pools()
         self.class_options = [
             {'name': 'Pistoleiro', 'desc': 'Ataques a longa distância.', 'id': 'pistol'},
             {'name': 'Espadachim', 'desc': 'Mais rápido e resistente.', 'id': 'sword'}
         ]
-
+    def define_enemy_pools(self):
+        """Define os inimigos para cada classe e seus chefes."""
+        self.pistol_enemies = [Cacto1, Cacto2, Cacto3, Bird1, Bird2]
+        self.pistol_boss = Cacto3
+        self.sword_enemies = [Bero, Miguel, Pam, Dann, Teki]
+        self.sword_boss = Bero
 
     def define_powerups(self):
         self.powerup_pool = [
@@ -85,12 +131,16 @@ class RogueliteMode:
     def select_class(self, class_id):
         if class_id == 'pistol':
             self.player.set_weapon(Pistol(self.player))
+            # Define a aparência do Dino
+            self.player.set_character("DINO_START", "DINO_RUNNING")
             self.player.speed = 5
             self.player.max_health = 100
         elif class_id == 'sword':
             self.player.set_weapon(Sword(self.player))
+            # Define a aparência do Bero
+            self.player.set_character("BERO_START", "BERO_RUNNING")
             self.player.speed = 7
-            self.player.max_health = 120
+            self.player.max_health = 200
         self.player.health = self.player.max_health
         self.game_state = "RUNNING"
         print(f"Classe {class_id} selecionada!")
@@ -140,30 +190,117 @@ class RogueliteMode:
         self.game_state = "RUNNING"
 
     def update(self):
+        """Atualiza a lógica de todos os elementos do jogo com as correções."""
         mouse_buttons = pygame.mouse.get_pressed()
-        if mouse_buttons[0]: self.player_attack_logic()
+        if mouse_buttons[0]:
+            self.player_attack_logic()
         self.player.update()
+        
+        # Atualiza inimigos e verifica colisão
         for enemy in self.enemies:
-            enemy.update(self.player)
+            enemy.update(self.player, self.enemy_projectiles)
             if self.player.rect.colliderect(enemy.rect):
-                if self.player.take_damage(0.5): self.set_game_over(); return
+                damage_taken = 1
+                if self.player.take_damage(damage_taken):
+                    self.set_game_over()
+                    self.screen_shake = self.shake_duration
+                    return
+                self.damage_numbers.add(PlayerDamageNumber(self.player.rect.centerx, self.player.rect.top, damage_taken, self.ui_font))
+            
+            # Adiciona feedback de cura para o chefe com temporizador
+            if enemy.is_boss and enemy.is_transforming:
+                current_time = pygame.time.get_ticks()
+                # Mostra um número de cura a cada 250ms (meio meio segundo)
+                if current_time - self.last_boss_heal_feedback_time > 250:
+                    self.last_boss_heal_feedback_time = current_time
+                    # Calcula a cura total nesse intervalo de tempo
+                    heal_amount_interval = enemy.heal_amount_per_second * 0.5 
+                    self.damage_numbers.add(HealNumber(enemy.rect.centerx, enemy.rect.top, heal_amount_interval, self.ui_font))
+
+        # Atualiza projéteis do jogador e cria números de dano/cura
         for proj in self.projectiles[:]:
             proj.update()
-            if not self.screen.get_rect().colliderect(proj.rect): self.projectiles.remove(proj); continue
+            if not self.screen.get_rect().colliderect(proj.rect):
+                self.projectiles.remove(proj)
+                continue
+            
             for enemy in self.enemies[:]:
                 if enemy.rect.colliderect(proj.rect):
                     damage_dealt = proj.damage
-                    self.player.heal(damage_dealt * self.player.life_steal_percent)
+                    self.damage_numbers.add(DamageNumber(enemy.rect.centerx, enemy.rect.top, damage_dealt, self.ui_font))
+                    
+                    heal_amount = damage_dealt * self.player.life_steal_percent
+                    if heal_amount >= 1:
+                        self.player.heal(heal_amount)
+                        self.damage_numbers.add(HealNumber(self.player.rect.centerx, self.player.rect.top, heal_amount, self.ui_font))
+
                     if enemy.take_damage(damage_dealt):
-                        self.score += enemy.max_health
-                        if self.player.gain_exp(enemy.exp_value): self.trigger_level_up()
-                        if enemy in self.enemies: self.enemies.remove(enemy)
+                        self.handle_enemy_death(enemy)
                     proj.pierce -= 1
                     if proj.pierce <= 0:
                         if proj in self.projectiles: self.projectiles.remove(proj)
                         break
+
+        # Atualiza projéteis inimigos e ativa o screen shake
+        for proj in self.enemy_projectiles[:]:
+            proj.update()
+            if not self.screen.get_rect().colliderect(proj.rect):
+                self.enemy_projectiles.remove(proj)
+                continue
+            
+            if self.player.rect.colliderect(proj.rect):
+                damage_taken = proj.damage
+                if self.player.take_damage(damage_taken):
+                    self.set_game_over()
+                self.screen_shake = self.shake_duration
+                self.damage_numbers.add(PlayerDamageNumber(self.player.rect.centerx, self.player.rect.top, damage_taken, self.ui_font))
+                self.enemy_projectiles.remove(proj)
+
+        self.damage_numbers.update()
+        if self.screen_shake > 0:
+            self.screen_shake -= 1
+        
         if self.wave_in_progress and not self.enemies:
-            self.wave_in_progress = False; self.projectiles.clear()
+            self.wave_in_progress = False
+            self.projectiles.clear()
+            self.enemy_projectiles.clear()
+            
+    def player_attack_logic(self):
+        attack_result = self.player.attack()
+        if not attack_result: return
+        
+        if isinstance(attack_result, tuple) and attack_result[0] == "BULLET":
+            _, x, y, direction = attack_result
+            self.projectiles.append(Bullet(x, y, direction, self.assets))
+        
+        elif isinstance(self.player.weapon, Sword) and self.player.weapon.is_swinging:
+            sword_hitbox = self.player.weapon.hitbox
+            if sword_hitbox:
+                for enemy in self.enemies[:]:
+                    if sword_hitbox.colliderect(enemy.rect):
+                        damage_dealt = self.player.weapon.damage
+                        self.damage_numbers.add(DamageNumber(enemy.rect.centerx, enemy.rect.top, damage_dealt, self.ui_font))
+                        
+                        # Adiciona feedback de cura para o jogador
+                        heal_amount = damage_dealt * self.player.life_steal_percent
+                        if heal_amount >= 1:
+                            self.player.heal(heal_amount)
+                            self.damage_numbers.add(HealNumber(self.player.rect.centerx, self.player.rect.top, heal_amount, self.ui_font))
+
+                        if enemy.take_damage(damage_dealt):
+                            self.handle_enemy_death(enemy)
+
+    def handle_enemy_death(self, enemy):
+        """Lida com a lógica de quando um inimigo é derrotado."""
+        self.score += enemy.max_health
+        if self.player.gain_exp(enemy.exp_value):
+            self.trigger_level_up()
+        if enemy.is_boss:
+            print("CHEFE DERROTADO! Recompensa: +5 de Velocidade!")
+            self.player.speed += 5
+        if enemy in self.enemies:
+            self.enemies.remove(enemy)
+
             
     def set_game_over(self):
         self.game_state = "GAME_OVER"
@@ -171,36 +308,52 @@ class RogueliteMode:
         print(f"Game Over! Pontuação final: {self.score}")
 
     def draw(self):
-        """Lógica de desenho baseada no estado do jogo."""
-        # Desenha o mundo do jogo sempre que não estiver na tela de escolha inicial
+        """Desenha tudo na tela com a lógica de hitboxes corrigida."""
+        render_offset = [0, 0]
+        if self.screen_shake > 0 and self.game_state == "RUNNING":
+            render_offset[0] = random.randint(-5, 5)
+            render_offset[1] = random.randint(-5, 5)
+
         if self.game_state != "CHOOSE_WEAPON":
             self.screen.fill((128, 128, 128))
-            self.player.draw(self.screen)
+            self.player.draw(self.screen, render_offset)
             
-            # --- HITBOXES REINTRODUZIDAS ---
-            pygame.draw.rect(self.screen, (255, 0, 0), self.player.rect, 2)
+            # --- GARANTIA DE TODAS AS HITBOXES ---
+            pygame.draw.rect(self.screen, (0, 255, 0), self.player.rect.move(render_offset), 2)
             
             for enemy in self.enemies: 
-                enemy.draw(self.screen)
-                pygame.draw.rect(self.screen, (0, 0, 255), enemy.rect, 2)
+                enemy.draw(self.screen, render_offset)
+                pygame.draw.rect(self.screen, (255, 0, 0), enemy.rect.move(render_offset), 2)
 
             for proj in self.projectiles: 
-                proj.draw(self.screen)
-                pygame.draw.rect(self.screen, (255, 255, 0), proj.rect, 2)
+                proj.draw(self.screen, render_offset)
+                pygame.draw.rect(self.screen, (255, 255, 0), proj.rect.move(render_offset), 2)
+            
+            for proj in self.enemy_projectiles:
+                proj.draw(self.screen, render_offset)
+                pygame.draw.rect(self.screen, (255, 0, 255), proj.rect.move(render_offset), 2)
             
             if self.player.weapon and isinstance(self.player.weapon, Sword):
-                self.player.weapon.draw(self.screen)
+                self.player.weapon.draw(self.screen, render_offset)
             
+            for number in self.damage_numbers:
+                self.screen.blit(number.image, (number.rect.x + render_offset[0], number.rect.y + render_offset[1]))
+
             self.draw_ui()
-            
-            if self.game_state == "RUNNING" and not self.wave_in_progress:
-                self.draw_start_wave_button()
+
+        if self.game_state == "RUNNING" and not self.wave_in_progress:
+            self.draw_start_wave_button()
         
-        # Desenha as telas de estado por cima
-        if self.game_state == "CHOOSE_WEAPON": self.draw_class_choice_screen()
-        elif self.game_state == "LEVEL_UP": self.draw_card_screen("Escolha um Power-up", self.powerup_options)
-        elif self.game_state == "PAUSED": self.draw_pause_screen()
-        elif self.game_state == "GAME_OVER": self.draw_game_over_screen()
+        if self.game_state == "CHOOSE_WEAPON":
+            self.screen.fill((128, 128, 128))
+            self.draw_class_choice_screen()
+        elif self.game_state == "LEVEL_UP":
+            self.draw_level_up_screen()
+        elif self.game_state == "PAUSED":
+            self.draw_pause_screen()
+        elif self.game_state == "GAME_OVER":
+            self.draw_game_over_screen()
+
 
 
     def draw_start_wave_button(self):
@@ -344,10 +497,55 @@ class RogueliteMode:
         self.current_wave += 1; self.wave_in_progress = True; self.spawn_enemies_for_wave()
     
     def spawn_enemies_for_wave(self):
-        self.enemies.clear(); num_enemies = 2 + self.current_wave 
+        """
+        Cria os inimigos para a wave atual com estrutura progressiva e spawn distante.
+        """
+        self.enemies.clear()
+        
+        enemy_pool = self.sword_enemies if isinstance(self.player.weapon, Sword) else self.pistol_enemies
+        boss_class = self.sword_boss if isinstance(self.player.weapon, Sword) else self.pistol_boss
+
+        if self.current_wave == 10:
+            print("!!! BOSS WAVE !!!")
+            x = SCREEN_WIDTH / 2
+            y = -100
+            self.enemies.append(boss_class(x, y, self.assets, is_boss=True))
+            return
+
+        num_enemies = 3 + self.current_wave
+        enemy_class_to_spawn = None
+
+        # Define qual classe de inimigo usar
+        if 1 <= self.current_wave <= 5:
+            enemy_index = self.current_wave - 1
+            if enemy_index < len(enemy_pool):
+                enemy_class_to_spawn = enemy_pool[enemy_index]
+                print(f"--- Wave de Introdução {self.current_wave}: Apenas {enemy_class_to_spawn.__name__} ---")
+        
+        # Se não for uma wave de introdução ou se o pool for menor que 5, usa inimigos aleatórios
+        if not enemy_class_to_spawn:
+            print(f"--- Wave Mista {self.current_wave}: Inimigos Aleatórios ---")
+            # Deixamos enemy_class_to_spawn como None para que seja escolhido aleatoriamente dentro do loop
+
+        # Loop de criação unificado
         for _ in range(num_enemies):
-            edge = random.choice(['left', 'right', 'top'])
-            if edge == 'left': x, y = -50, random.randint(0, SCREEN_HEIGHT)
-            elif edge == 'right': x, y = SCREEN_WIDTH + 50, random.randint(0, SCREEN_HEIGHT)
-            else: x, y = random.randint(0, SCREEN_WIDTH), -50
-            self.enemies.append(Zumbi(x, y, self.assets))
+            # Se uma classe específica foi definida, usa-a. Senão, escolhe uma aleatória.
+            chosen_class = enemy_class_to_spawn or random.choice(enemy_pool)
+            
+            edge = random.choice(['left', 'right', 'top', 'bottom'])
+            
+            # Lógica de spawn distante
+            if edge == 'left':
+                x = random.randint(-150, -50)
+                y = random.randint(0, SCREEN_HEIGHT)
+            elif edge == 'right':
+                x = random.randint(SCREEN_WIDTH + 50, SCREEN_WIDTH + 150)
+                y = random.randint(0, SCREEN_HEIGHT)
+            elif edge == 'top':
+                x = random.randint(0, SCREEN_WIDTH)
+                y = random.randint(-150, -50)
+            else: # bottom
+                x = random.randint(0, SCREEN_WIDTH)
+                y = random.randint(SCREEN_HEIGHT + 50, SCREEN_HEIGHT + 150)
+                
+            self.enemies.append(chosen_class(x, y, self.assets))
