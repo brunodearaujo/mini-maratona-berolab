@@ -6,24 +6,24 @@ from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 class Bird1(Enemy):
     def __init__(self, x, y, assets, is_boss=False):
-        # ADICIONE ESTA LINHA:
         self.assets = assets
-
-        health = 60
-        damage = 10
-        speed = 1.8
-        exp_value = 25
-        image = self.assets.get_image("BIRD1")
+        # CORREÇÃO: Pega a LISTA de imagens de animação do AssetManager
+        image = self.assets.get_image("BIRD") # Assumindo que "BIRD" é a sua lista de frames
+        health, damage, speed, exp_value = 60, 10, 1.8, 25
         super().__init__(x, y, image, health, damage, speed, exp_value, is_boss)
-
-        # Atributos de combate à distância
-        self.attack_cooldown = 2500 # Atira a cada 2.5 segundos
+        
+        self.hitbox = self.rect.inflate(-15, -15)
+        
+        self.attack_cooldown = 2500
         self.last_shot_time = pygame.time.get_ticks()
         self.preferred_distance = 350
 
     def update(self, player, enemy_projectiles):
-        """IA do Bird1: mantém distância, atira e respeita os limites da tela."""
-        # --- Lógica de movimento e tiro (código que você já tem) ---
+        # A lógica de animação agora está na classe base Enemy, então
+        # chamamos o super().update() primeiro.
+        super().update(player, enemy_projectiles)
+
+        # Lógica de IA específica do Bird1 (manter distância e atirar)
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
         distance = (dx**2 + dy**2)**0.5
@@ -31,10 +31,8 @@ class Bird1(Enemy):
         if distance > 0:
             if distance < self.preferred_distance:
                 self.rect.x -= (dx / distance) * self.speed
-                self.rect.y -= (dy / distance) * self.speed
             else:
                 self.rect.x += (dx / distance) * self.speed
-                self.rect.y += (dy / distance) * self.speed
         
         current_time = pygame.time.get_ticks()
         if current_time - self.last_shot_time > self.attack_cooldown:
@@ -44,10 +42,10 @@ class Bird1(Enemy):
                 projectile = EnemyProjectile(self.rect.centerx, self.rect.centery, direction, self.assets)
                 enemy_projectiles.append(projectile)
 
-        # --- ADICIONE ESTE BLOCO DE CÓDIGO NO FINAL DO MÉTODO ---
-        # Garante que o inimigo não saia do mapa
+        # Limites de tela
         if self.rect.left < 0: self.rect.left = 0
         if self.rect.right > SCREEN_WIDTH: self.rect.right = SCREEN_WIDTH
         if self.rect.top < 0: self.rect.top = 0
         if self.rect.bottom > SCREEN_HEIGHT: self.rect.bottom = SCREEN_HEIGHT
-
+        
+        self.hitbox.center = self.rect.center

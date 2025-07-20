@@ -19,14 +19,14 @@ class Cloud:
         screen.blit(self.image, (self.x, self.y))
 
 class EndlessRunner:
-    def __init__(self, screen, high_score, assets, first_run=False):
+    def __init__(self, screen, high_score, assets, sounds, settings, first_run=False):
         self.screen = screen
         self.high_score = high_score
-        self.assets = assets # Armazena o AssetManager
+        self.assets = assets
+        self.sounds = sounds
+        self.settings = settings
         
-        # Pega as imagens do AssetManager
         self.bg_image = self.assets.get_image("BG")
-        
         self.player = EndlessRunnerDino(self.assets, first_run=first_run)
         self.obstacle_list = []
         self.clouds = []
@@ -64,7 +64,11 @@ class EndlessRunner:
                 self.spawn_obstacle()
             for obstacle in self.obstacle_list:
                 obstacle.update(self.game_speed, self.obstacle_list)
-                if self.player.dino_rect.colliderect(obstacle.rect):
+                
+                player_hitbox = self.player.dino_rect.inflate(-40, -20)
+                
+                # CORREÇÃO: A colisão agora usa a hitbox justa do obstáculo
+                if player_hitbox.colliderect(obstacle.hitbox):
                     self.player.die()
                     return False
         return True
@@ -86,7 +90,6 @@ class EndlessRunner:
         for cloud in self.clouds:
             cloud.draw(self.screen)
         
-        # Usa a imagem de fundo do AssetManager
         image_width = self.bg_image.get_width()
         self.screen.blit(self.bg_image, (self.x_pos_bg, self.y_pos_bg))
         self.screen.blit(self.bg_image, (self.x_pos_bg + image_width, self.y_pos_bg))
@@ -95,6 +98,12 @@ class EndlessRunner:
         for obstacle in self.obstacle_list:
             obstacle.draw(self.screen)
         
+        # CORREÇÃO: O desenho da hitbox agora mostra a hitbox de colisão real
+        #player_hitbox_debug = self.player.dino_rect.inflate(-40, -20)
+        #pygame.draw.rect(self.screen, (255, 0, 0), player_hitbox_debug, 2)
+        #for obstacle in self.obstacle_list:
+        #    pygame.draw.rect(self.screen, (0, 0, 255), obstacle.hitbox, 2)
+
         score_text = f"{self.score:05d}"
         draw_message_component(score_text, self.screen, pos_x_center=1000, pos_y_center=50)
         high_score_text = f"HI {self.high_score:05d}"

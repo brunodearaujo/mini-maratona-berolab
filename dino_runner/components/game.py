@@ -4,18 +4,20 @@ import pygame
 from dino_runner.components.modes.endless_runner import EndlessRunner
 from dino_runner.components.modes.roguelite_mode import RogueliteMode
 from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, TITLE, FPS
-from dino_runner.utils.text_utils import draw_message_component
-# 1. Importa o AssetManager
 from dino_runner.utils.asset_manager import AssetManager
+from dino_runner.utils.sound_manager import SoundManager
+from dino_runner.utils.text_utils import draw_message_component
 
 class GameController:
-    # 2. O __init__ não recebe mais 'assets' como argumento
     def __init__(self):
         pygame.init()
+        pygame.mixer.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         
-        # 3. Cria a instância do AssetManager AQUI, depois de inicializar a tela
+        self.settings = {"music": True, "sfx": True, "shake": True}
+        
         self.assets = AssetManager()
+        self.sounds = SoundManager(self.settings)
         
         pygame.display.set_caption(TITLE)
         pygame.display.set_icon(self.assets.get_image("ICON"))
@@ -32,8 +34,8 @@ class GameController:
         self.last_score = 0
         self.load_high_scores()
 
-        # 4. Usa a imagem correta do AssetManager
         self.menu_dino_image = pygame.transform.scale(self.assets.get_image("DINO_START"), (120, 120))
+        self.option_button_rects = {}
 
     def execute(self):
         while self.running:
@@ -59,17 +61,21 @@ class GameController:
 
     def run_gameplay(self, events):
         if not self.game_mode_instance:
+            self.sounds.stop_music()
+            
             if self.game_mode_type == "NORMAL":
-                # 5. Passa o AssetManager para os modos de jogo
-                self.game_mode_instance = EndlessRunner(self.screen, self.high_score_normal, self.assets, self.first_run)
+                self.sounds.play_music("normal_theme.mp3")
+                # CORREÇÃO: A chamada agora passa todos os argumentos na ordem correta
+                self.game_mode_instance = EndlessRunner(self.screen, self.high_score_normal, self.assets, self.sounds, self.settings, self.first_run)
                 self.first_run = False
             elif self.game_mode_type == "ROGUELITE":
-                # 5. Passa o AssetManager para os modos de jogo
-                self.game_mode_instance = RogueliteMode(self.screen, self.high_score_roguelite, self.assets)
+                self.sounds.play_music("roguelite_theme.mp3")
+                self.game_mode_instance = RogueliteMode(self.screen, self.high_score_roguelite, self.assets, self.sounds, self.settings)
 
         run_result = self.game_mode_instance.run(events)
 
         if not run_result or run_result == "MENU":
+            self.sounds.stop_music()
             if self.game_mode_type == "NORMAL":
                 self.last_score = self.game_mode_instance.score
                 if self.last_score > self.high_score_normal:
@@ -82,9 +88,9 @@ class GameController:
             
             if run_result == "MENU":
                 self.game_state = "MENU"
-                self.game_mode_instance = None
             else:
                 self.game_state = "GAME_OVER"
+            self.game_mode_instance = None
 
     def show_menu(self, events):
         self.screen.fill((255, 255, 255))
@@ -94,16 +100,35 @@ class GameController:
         normal_button = draw_message_component("Normal Mode", self.screen, pos_y_center=SCREEN_HEIGHT // 2 + 50, has_background=True, return_rect=True)
         roguelite_button = draw_message_component("Roguelite Mode", self.screen, pos_y_center=SCREEN_HEIGHT // 2 + 120, has_background=True, return_rect=True)
 
+        self.draw_options_buttons()
+
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if normal_button.collidepoint(event.pos):
-                    self.game_mode_type = "NORMAL"
-                    self.game_mode_instance = None
-                    self.game_state = "RUNNING"
+                    self.game_mode_type = "NORMAL"; self.game_state = "RUNNING"
                 elif roguelite_button.collidepoint(event.pos):
-                    self.game_mode_type = "ROGUELITE"
-                    self.game_mode_instance = None
-                    self.game_state = "RUNNING"
+                    self.game_mode_type = "ROGUELITE"; self.game_state = "RUNNING"
+                
+                for option, rect in self.option_button_rects.items():
+                    if rect.collidepoint(event.pos):
+                        self.settings[option] = not self.settings[option]
+                        if option == 'music' and not self.settings['music']:
+                            self.sounds.stop_music()
+
+    def draw_options_buttons(self):
+        options = ["music", "sfx", "shake"]
+        start_x = SCREEN_WIDTH - 150
+        start_y = SCREEN_HEIGHT - 120
+        
+        for i, option in enumerate(options):
+            y_pos = start_y + (i * 40)
+            is_on = self.settings[option]
+            
+            text = f"{option.upper()}: {'ON' if is_on else 'OFF'}"
+            color = (0, 150, 0) if is_on else (150, 0, 0)
+            
+            button_rect = draw_message_component(text, self.screen, pos_x_center=start_x, pos_y_center=y_pos, bg_color=color, return_rect=True)
+            self.option_button_rects[option] = button_rect
 
     def show_game_over_screen(self, events):
         if self.game_mode_instance:

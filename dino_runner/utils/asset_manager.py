@@ -71,9 +71,10 @@ class AssetManager:
         self.images["BERO_RUNNING"] = [ self.images["BERO_START"], self.images["BERO_START"] ]
         
         # --- Inimigos e Armas (Modo Roguelite) ---
-        self._load_image("BULLET", "weapons/bullet.png")
+        self._load_image("BULLET", "weapons/fireball.png")
         self._load_image("ENEMY_BULLET", "weapons/enemy_bullet.png")
         self._load_image("SHARD", "weapons/shard.png")
+        self._load_image("SWORD_SLASH", "weapons/sword_slash.png")
 
         # --- Inimigos do Caminho do Dino (Pistoleiro) ---
         self._load_image("CACTO1", "enemies/dino_path/cacto1.png")

@@ -8,23 +8,26 @@ from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT
 class Pam(Enemy):
     def __init__(self, x, y, assets, is_boss=False):
         self.assets = assets
-
-        health = 70
-        damage = 12
-        speed = 1.6
-        exp_value = 30
         image = self.assets.get_image("PAM")
+        
+        # --- REDIMENSIONAMENTO DA IMAGEM ---
+        image = pygame.transform.scale(image, (70, 90))
+
+        # --- BALANCEAMENTO: SNIPER ---
+        health = 60    # Vida baixa
+        damage = 5     # Dano de colisão baixo (o perigo são os tiros)
+        speed = 1.2    # Lenta, posiciona-se para atirar
+        exp_value = 30
+
         super().__init__(x, y, image, health, damage, speed, exp_value, is_boss)
-
-        # Atributos de combate à distância
-        self.attack_cooldown = 2200 # Atira um pouco mais rápido
+        self.hitbox = self.rect.inflate(-15, -15)
+        
+        self.attack_cooldown = 3000 # Cooldown longo entre os tiros
         self.last_shot_time = pygame.time.get_ticks()
-        self.preferred_distance = 300
-
+        self.preferred_distance = 450 # Tenta ficar bem longe
 
     def update(self, player, enemy_projectiles):
         """IA da Pam: mantém distância, atira e respeita os limites da tela."""
-        # --- Lógica de movimento e tiro (código que você já tem) ---
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
         distance = (dx**2 + dy**2)**0.5
@@ -45,9 +48,11 @@ class Pam(Enemy):
                 projectile = EnemyProjectile(self.rect.centerx, self.rect.centery, direction, self.assets)
                 enemy_projectiles.append(projectile)
 
-        # --- ADICIONE ESTE BLOCO DE CÓDIGO NO FINAL DO MÉTODO ---
-        # Garante que o inimigo não saia do mapa
         if self.rect.left < 0: self.rect.left = 0
         if self.rect.right > SCREEN_WIDTH: self.rect.right = SCREEN_WIDTH
         if self.rect.top < 0: self.rect.top = 0
         if self.rect.bottom > SCREEN_HEIGHT: self.rect.bottom = SCREEN_HEIGHT
+        
+        # CORREÇÃO: Garante que a hitbox se move juntamente com a imagem.
+        self.hitbox.center = self.rect.center
+

@@ -6,28 +6,35 @@ from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 from dino_runner.components.weapons.shard import Shard
 
 class Enemy:
+    import pygame
+import random
+from dino_runner.utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+from dino_runner.components.weapons.shard import Shard
+
+class Enemy:
     def __init__(self, x, y, image, health, damage, speed, exp_value, is_boss=False, rage_chance=0.1):
-        self.original_image = image
-        self.image = image
+        # CORREÇÃO: Lida com imagens únicas ou listas de imagens (para animação)
+        self.is_animated = isinstance(image, list)
+        if self.is_animated:
+            self.animation_frames = image
+            self.image_index = 0
+            self.image = self.animation_frames[self.image_index]
+        else:
+            self.animation_frames = None
+            self.image = image
+        
         self.rect = self.image.get_rect(center=(x, y))
+        self.hitbox = self.rect.copy()
+        
+        self.speed = speed
+        self.original_speed = speed # Guarda a velocidade original
+        self.is_slowed = False
+        self.slow_duration = 0
+        self.slow_start_time = 0
+
+        self.original_image = self.image # Guarda a imagem do primeiro frame como original
         self.is_boss = is_boss
         self.is_in_rage = False
-
-        # --- ATRIBUTOS PARA O FLASH DE DANO ---
-        self.is_flashing = False
-        self.flash_duration = 100 # Duração do flash em milissegundos
-        self.flash_start_time = 0
-
-
-        # --- 1. NOVOS ATRIBUTOS PARA O COMBO DE SKILL ---
-        self.skill_cooldown = 8000 # Aumentei o cooldown geral para 8s
-        self.last_skill_time = 0
-        self.is_casting = False      # Está no meio do combo de 3 ataques?
-        self.cast_count = 0          # Quantos ataques já fez no combo
-        self.time_between_casts = 600 # 0.6s entre cada ataque do combo
-        self.last_cast_time = 0
-
-        # Atributos para a transformação do chefe
         self.is_transforming = False
         self.is_invulnerable = False
         self.damage_resistance = 0.0
@@ -35,18 +42,24 @@ class Enemy:
         self.flash_timer = 0
         self.show_image = True
         self.heal_amount_per_second = 0
+        self.is_flashing = False
+        self.flash_duration = 100
+        self.flash_start_time = 0
+        self.is_casting = False
+        self.cast_count = 0
+        self.time_between_casts = 600
+        self.last_cast_time = 0
+        self.skill_cooldown = 8000
+        self.last_skill_time = 0
 
-        self.is_entering = False
-        self.entry_target_pos = (SCREEN_WIDTH / 2, 150) # Posição final da entrada
-        # Modificadores de Chefe
         if self.is_boss:
             health *= 5; damage *= 2; exp_value *= 10
             scaled_image = pygame.transform.scale_by(self.original_image, 2)
             self.image = scaled_image
             self.original_image = scaled_image
             self.rect = self.image.get_rect(center=self.rect.center)
-            # Ativa o estado de entrada para o chefe
             self.is_entering = True
+            self.entry_target_pos = (SCREEN_WIDTH / 2, 150)
         
         self.health = health
         self.max_health = health
@@ -57,6 +70,15 @@ class Enemy:
         if not self.is_boss and random.random() < rage_chance:
             self.activate_rage()
 
+
+    def apply_slow(self, slow_factor, duration):
+        """Aplica um efeito de lentidão ao inimigo."""
+        if not self.is_slowed:
+            self.speed *= (1 - slow_factor)
+            self.is_slowed = True
+            self.slow_duration = duration
+            self.slow_start_time = pygame.time.get_ticks()
+    
     def use_ground_slam(self, enemy_projectiles, assets):
         """O chefe bate no chão, lançando estilhaços em 8 direções com um leve desvio."""
         print(f"CHEFE usou Ground Slam #{self.cast_count + 1}!")
@@ -103,12 +125,21 @@ class Enemy:
         self.speed *= 1.5
         self.health = int(self.health * 1.5)
         self.max_health = self.health
-        red_image = self.original_image.copy()
-        red_filter = pygame.Surface(red_image.get_size()).convert_alpha()
-        red_filter.fill((255, 0, 0, 100))
-        red_image.blit(red_filter, (0, 0))
-        self.image = red_image
 
+        # CORREÇÃO: Cria um efeito de "rage" que segue o contorno do personagem.
+        # Isto evita o "quadrado vermelho" grande.
+        rage_image = self.original_image.copy()
+        # Cria uma máscara a partir da transparência da imagem
+        mask = pygame.mask.from_surface(rage_image)
+        # Converte a máscara numa superfície que podemos colorir
+        mask_surf = mask.to_surface(setcolor=(255, 0, 0), unsetcolor=(0, 0, 0))
+        # Define a cor preta como transparente
+        mask_surf.set_colorkey((0, 0, 0))
+        
+        # Desenha o brilho vermelho por cima da imagem original
+        rage_image.blit(mask_surf, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+        self.image = rage_image
+        
     def take_damage(self, amount):
         if self.is_invulnerable: return False
         if self.is_boss and not self.is_in_rage and (self.health - amount) / self.max_health <= 0.3:
@@ -126,11 +157,20 @@ class Enemy:
 
     def update(self, player, enemy_projectiles):
 
-        if self.is_flashing:
+        if self.is_slowed:
             current_time = pygame.time.get_ticks()
-            if current_time - self.flash_start_time > self.flash_duration:
+            if current_time - self.slow_start_time > self.slow_duration:
+                self.is_slowed = False
+                self.speed = self.original_speed # Restaura a velocidade
+        
+
+        if self.is_flashing:
+            if pygame.time.get_ticks() - self.flash_start_time > self.flash_duration:
                 self.is_flashing = False
 
+        if self.is_animated:
+            self.image_index = (self.image_index + 0.1) % len(self.animation_frames)
+            self.image = self.animation_frames[int(self.image_index)]
 
         """Atualiza a lógica do inimigo, incluindo a transformação e o movimento."""
         if self.is_transforming:
@@ -170,6 +210,7 @@ class Enemy:
                 self.is_casting = False
                 self.last_skill_time = current_time
             
+            
             # Fica parado enquanto estiver castando
             return
 
@@ -182,21 +223,30 @@ class Enemy:
         self.rect.x += dx * self.speed
         self.rect.y += dy * self.speed
 
+        self.hitbox.center = self.rect.center
+
+
         
 
 
     def draw(self, screen, offset=[0, 0]):
-        """Desenha o inimigo e sua barra de vida, considerando o offset."""
         image_to_draw = self.image
+        
+        # Aplica o efeito visual de flash de dano
         if self.is_flashing:
-            white_image = self.original_image.copy()
-            white_image.fill((255, 255, 255, 180), special_flags=pygame.BLEND_RGBA_MULT)
-            image_to_draw = white_image
+            flash_image = self.image.copy()
+            flash_image.fill((200, 200, 200), special_flags=pygame.BLEND_RGB_ADD)
+            image_to_draw = flash_image
+        # CORREÇÃO: Aplica o efeito visual de lentidão (congelado)
+        elif self.is_slowed:
+            slow_image = self.image.copy()
+            # Usa um filtro azul claro para o efeito de gelo
+            slow_image.fill((100, 100, 255), special_flags=pygame.BLEND_RGB_ADD)
+            image_to_draw = slow_image
         
         if self.show_image:
             screen.blit(image_to_draw, (self.rect.x + offset[0], self.rect.y + offset[1]))
         
-        # A barra de vida também precisa receber o offset
         self.draw_health_bar(screen, offset)
 
 

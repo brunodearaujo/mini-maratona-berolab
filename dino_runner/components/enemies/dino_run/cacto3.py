@@ -11,4 +11,7 @@ class Cacto3(Enemy):
         exp_value = 20
         image = assets.get_image("CACTO3")
         super().__init__(x, y, image, health, damage, speed, exp_value, is_boss)
-    # Pode adicionar IA específica aqui no futuro
+        
+        # AJUSTE DA HITBOX: Agora você pode encolher a hitbox para ser mais justa.
+        # Esta linha sobrescreve a hitbox padrão criada na classe Enemy.
+        self.hitbox = self.rect.inflate(-25, -15)
